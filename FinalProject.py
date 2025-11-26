@@ -89,8 +89,8 @@ def insert_team_data(data):
 
 
 def get_football_results(link):
-    # Input: link to College Football API
-    # Output: List of Dictonaries, each dictionary is a game and contains data home_team_name, away_team_name, home_team_points, away_team_points, date, city
+    # Input: Link to College Football API (string)
+    # Output: List of Dictonaries, each dictionary is a game and contains home_team_name(string), away_team_name(string), home_team_points(int), away_team_points(int), date(string), city(string)
 
     API_KEY = 'NvYq3srg3jWcngq2uVqbwXg4Kl3ESAEbOwsEzlXxh2V7uRf05RbrAt3qSQqIvkrM'
     list = []
@@ -106,8 +106,8 @@ def get_football_results(link):
     }
 
     # game_data conatins all info except city, venue_data conatins cities for each statiom 
-    game_data = requests.get(link + "games", headers=headers, params=params)
-    venue_data = requests.get(link + "venues", headers=headers)
+    game_data = requests.get(link + "/games", headers=headers, params=params)
+    venue_data = requests.get(link + "/venues", headers=headers)
 
     for game in game_data.json():
         inner = {
@@ -128,23 +128,20 @@ def get_football_results(link):
     return list
 
 
-def get_city_coords(city_name):
-    url = "https://geocoding-api.open-meteo.com/v1/search"
-    params = {"name": city_name}
+def get_city_coords(link, city_name):
+    # Input: Link to API (string) and city name (string)
+    # Output: Tuple containing Latitude (float) and Longitude (float)
 
-    r = requests.get(url, params=params).json()
+    params = {
+        "name": city_name
+        }
 
-    if "results" not in r or len(r["results"]) == 0:
-        return None
+    city_data = requests.get(link + "/search", params=params).json()
 
-    city = r["results"][0]
+    city = city_data["results"][0]
 
-    return {
-        "name": city["name"],
-        "lat": city["latitude"],
-        "lon": city["longitude"],
-        "country": city.get("country")
-    }
+    return (city["latitude"], city["longitude"])
+
 
 
 def get_past_weather(lat, lon, date_str):
@@ -212,15 +209,13 @@ def main():
     # print("Ann Arbor:", ann_arbor)
 
 
-    # coords = get_city_coords("Ann Arbor")
+    coords = get_city_coords("https://geocoding-api.open-meteo.com/v1", "Ann Arbor")
     # print(coords)
-    # lat = coords['lat']
-    # long = coords['lon']
 
-
-    data = get_football_results("https://api.collegefootballdata.com/")
+    games = get_football_results("https://api.collegefootballdata.com")
+    # print(games)
     
-    insert_team_data(data)
+    insert_team_data(games)
 
 
 if __name__ == "__main__":
