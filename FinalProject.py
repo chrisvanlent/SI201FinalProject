@@ -79,10 +79,50 @@ def create_tables(cur, conn):
     
 
 
-def insert_team_data(data):
+def insert_team_data(data, cur, conn):
 
-    # pprint.pprint(data)
-    pass
+    # Insert home_team_name to teams Table
+    cur.execute("""
+    INSERT INTO teams (team_name)
+        VALUES (?);
+    """, (data["home_team_name"],))
+
+    home_team_id = cur.lastrowid
+    print("home_team_id:", home_team_id)
+
+    # Insert away_team_name to teams Table
+    cur.execute("""
+    INSERT INTO teams (team_name)
+        VALUES (?);
+    """, (data["away_team_name"],))
+
+    away_team_id = cur.lastrowid
+    print("away_team_id:", away_team_id)
+
+    # Insert date to gamedates Table
+    cur.execute("""
+    INSERTINTO gamedates (game_date)
+        VALUES (?);
+    """, (data["date"],))
+
+    date_id = cur.lastrowid
+    print("date_id:", date_id)
+
+    # Insert city to cities Table
+    cur.execute("""
+    INSERT INTO cities (city_name)
+        VALUES (?);
+    """, (data["city"],))
+
+    city_id = cur.lastrowid
+    print("city_id:", city_id)
+
+    team = cur.execute("""
+    INSERT INTO games (game_id, home_team_id, away_team_id, home_points, away_points, date_id, city_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?);
+    """, (data["game_id"], home_team_id, away_team_id, data["home_team_points"], data["away_team_points"], date_id, city_id))
+
+    conn.commit()
 
 
 
@@ -112,6 +152,7 @@ def get_football_results():
 
     for game in game_data.json():
         inner = {
+            "game_id": game["id"],
             "home_team_name": game["homeTeam"],
             "away_team_name": game["awayTeam"],
             "home_team_points": game["homePoints"],
@@ -197,14 +238,14 @@ def main():
     games = get_football_results()
     print(games[0]["city"])
 
+    for i in range(5):
+        insert_team_data(games[i], cur, conn)
+
     coords = get_city_coords(games[0]["city"])
     print(coords)
 
     weather = get_past_weather(coords["latitude"], coords["longitude"], games[0]["date"])
     print(weather)
-
-
-    insert_team_data(games)
 
 
 if __name__ == "__main__":
