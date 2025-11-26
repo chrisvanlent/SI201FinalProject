@@ -88,11 +88,12 @@ def insert_team_data(data):
 
 
 
-def get_football_results(link):
-    # Input: Link to College Football API (string)
+def get_football_results():
+    # Input: None
     # Output: List of Dictonaries, each dictionary is a game and contains home_team_name(string), away_team_name(string), home_team_points(int), away_team_points(int), date(string), city(string)
 
     API_KEY = 'NvYq3srg3jWcngq2uVqbwXg4Kl3ESAEbOwsEzlXxh2V7uRf05RbrAt3qSQqIvkrM'
+    link = "https://api.collegefootballdata.com"
     list = []
 
     headers = {
@@ -129,9 +130,11 @@ def get_football_results(link):
     return list
 
 
-def get_city_coords(link, city_name):
-    # Input: Link to API (string) and city name (string)
+def get_city_coords(city_name):
+    # Input: City name (string)
     # Output: Dictionary containing Latitude (float) and Longitude (float)
+
+    link = "https://geocoding-api.open-meteo.com/v1"
 
     params = {
         "name": city_name
@@ -145,9 +148,11 @@ def get_city_coords(link, city_name):
 
 
 
-def get_past_weather(link, lat, lon, date_str):
-    # Input: Link to weather API (str) latitude (float) Longitude (float) and date (str)
+def get_past_weather(lat, lon, date_str):
+    # Input: Latitude (float) Longitude (float) and date (str)
     # Output: Dictionary containing temp_max (float) temp_min (float) precipitation (float) and wind_max (float)
+
+    link = "https://archive-api.open-meteo.com/v1"
 
     params = {
         "latitude": lat,
@@ -167,8 +172,7 @@ def get_past_weather(link, lat, lon, date_str):
 
     d = weather_data.json()["daily"]
 
-    # pprint.pprint(d)
-
+    # All units are metric; Celcius, mm, km/h
     result = {
         "temp_max": d["temperature_2m_max"][0],
         "temp_min": d["temperature_2m_min"][0],
@@ -190,25 +194,17 @@ def main():
 
     create_tables(cur, conn)
 
-    # # Ann Arbor, MI on 2024-11-20
-    # ann_arbor = get_past_weather("https://archive-api.open-meteo.com/v1", 42.2808, -83.7430, "2024-11-20")
-    # print(ann_arbor)
-
-    # coords = get_city_coords("https://geocoding-api.open-meteo.com/v1", "Ann Arbor")
-    # print(coords)
-
-    games = get_football_results("https://api.collegefootballdata.com")
-    # print(games)
-    
-    insert_team_data(games)
-
+    games = get_football_results()
     print(games[0]["city"])
 
-    philippi_coords = get_city_coords("https://geocoding-api.open-meteo.com/v1", games[0]["city"])
-    print(philippi_coords)
+    coords = get_city_coords(games[0]["city"])
+    print(coords)
 
-    philippi_weather = get_past_weather("https://archive-api.open-meteo.com/v1", philippi_coords["latitude"], philippi_coords["longitude"], games[0]["date"])
-    print(philippi_weather)
+    weather = get_past_weather(coords["latitude"], coords["longitude"], games[0]["date"])
+    print(weather)
+
+
+    insert_team_data(games)
 
 
 if __name__ == "__main__":
