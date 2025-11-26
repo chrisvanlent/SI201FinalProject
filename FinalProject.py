@@ -115,7 +115,8 @@ def get_football_results(link):
             "away_team_name": game["awayTeam"],
             "home_team_points": game["homePoints"],
             "away_team_points": game["awayPoints"],
-            "date": game["startDate"][:10]}
+            "date": game["startDate"][:10]
+            }
 
         # taking stadiom from game_data and cross referancing with venue_data to find city
         for venue in venue_data.json():
@@ -130,7 +131,7 @@ def get_football_results(link):
 
 def get_city_coords(link, city_name):
     # Input: Link to API (string) and city name (string)
-    # Output: Tuple containing Latitude (float) and Longitude (float)
+    # Output: Dictionary containing Latitude (float) and Longitude (float)
 
     params = {
         "name": city_name
@@ -140,25 +141,13 @@ def get_city_coords(link, city_name):
 
     city = city_data["results"][0]
 
-    return (city["latitude"], city["longitude"])
+    return {"latitude": city["latitude"], "longitude": city["longitude"]}
 
 
 
-def get_past_weather(lat, lon, date_str):
-    """
-    Get daily weather summary for a specific date and location
-    using Open-Meteo's free archive API (no key needed).
-
-    Returns:
-      {
-        "date": "...",
-        "temp_max": ...,
-        "temp_min": ...,
-        "precip_sum": ...,
-        "wind_max": ...
-      }
-    """
-    url = "https://archive-api.open-meteo.com/v1/archive"
+def get_past_weather(link, lat, lon, date_str):
+    # Input: Link to weather API (str) latitude (float) Longitude (float) and date (str)
+    # Output: Dictionary containing temp_max (float) temp_min (float) precipitation (float) and wind_max (float)
 
     params = {
         "latitude": lat,
@@ -174,19 +163,16 @@ def get_past_weather(lat, lon, date_str):
         "timezone": "America/Detroit"
     }
 
-    resp = requests.get(url, params=params)
-    data = resp.json()
+    weather_data = requests.get(link + "/archive", params=params)
 
-    if "daily" not in data or not data["daily"]["time"]:
-        return None
+    d = weather_data.json()["daily"]
 
-    d = data["daily"]
+    # pprint.pprint(d)
 
     result = {
-        "date": d["time"][0],
         "temp_max": d["temperature_2m_max"][0],
         "temp_min": d["temperature_2m_min"][0],
-        "precip_sum": d["precipitation_sum"][0],
+        "precipitation": d["precipitation_sum"][0],
         "wind_max": d["windspeed_10m_max"][0]
     }
 
@@ -205,17 +191,24 @@ def main():
     create_tables(cur, conn)
 
     # # Ann Arbor, MI on 2024-11-20
-    # ann_arbor = get_past_weather(42.2808, -83.7430, "2024-11-20")
-    # print("Ann Arbor:", ann_arbor)
+    # ann_arbor = get_past_weather("https://archive-api.open-meteo.com/v1", 42.2808, -83.7430, "2024-11-20")
+    # print(ann_arbor)
 
-
-    coords = get_city_coords("https://geocoding-api.open-meteo.com/v1", "Ann Arbor")
+    # coords = get_city_coords("https://geocoding-api.open-meteo.com/v1", "Ann Arbor")
     # print(coords)
 
     games = get_football_results("https://api.collegefootballdata.com")
     # print(games)
     
     insert_team_data(games)
+
+    print(games[0]["city"])
+
+    philippi_coords = get_city_coords("https://geocoding-api.open-meteo.com/v1", games[0]["city"])
+    print(philippi_coords)
+
+    philippi_weather = get_past_weather("https://archive-api.open-meteo.com/v1", philippi_coords["latitude"], philippi_coords["longitude"], games[0]["date"])
+    print(philippi_weather)
 
 
 if __name__ == "__main__":
