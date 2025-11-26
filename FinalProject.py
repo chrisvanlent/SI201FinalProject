@@ -47,80 +47,95 @@ def create_tables(cur, conn):
     cur.execute("""   
     CREATE TABLE games (
         game_id INTEGER PRIMARY KEY,
-        date_id INTEGER NOT NULL,
         home_team_id INTEGER NOT NULL,
         away_team_id INTEGER NOT NULL,
         home_points INTEGER,
         away_points INTEGER,
         city_id INTEGER NOT NULL,
+        date_id INTEGER NOT NULL,
+        weather_id INTEGER NOT NULL,
                 
-    FOREIGN KEY (city_id) REFERENCES cities(city_id)
+    FOREIGN KEY (city_id) REFERENCES cities(city_id),
     FOREIGN KEY (date_id) REFERENCES gamedates(date_id),
     FOREIGN KEY (home_team_id) REFERENCES teams(team_id),
-    FOREIGN KEY (away_team_id) REFERENCES teams(team_id)
+    FOREIGN KEY (away_team_id) REFERENCES teams(team_id),
+    FOREIGN KEY (weather_id) REFERENCES weather(weather_id)
     );""")  
   
     cur.execute("""              
     CREATE TABLE weather (
         weather_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        game_id INTEGER UNIQUE NOT NULL,
+        city_id INTEGER NOT NULL,
+        date_id INTEGER NOT NULL,
         temp_max FLOAT,
         temp_min FLOAT,
         precipitation FLOAT,
         windspeed_max FLOAT,
-        latitude FLOAT,
-        longitude FLOAT,
 
-    FOREIGN KEY (game_id) REFERENCES games(game_id)
+    FOREIGN KEY (city_id) REFERENCES cities(city_id),
+    FOREIGN KEY (date_id) REFERENCES gamedates(date_id)
 );""")  
     
     conn.commit()  
 
+
+
+
+
+
+def insert_into_table(data, data_name, id_name, table, cur, conn):
+    # Inputs: data, data_name (str), id_name (str), table(str), cur and conn
+    # Outputs: data_id (int)
+
+    # Tries for find data in table
+    command = "SELECT " + id_name + " FROM " + table + " WHERE " + data_name + " = ?;"
+    cur.execute(command, (data,))
+    row = cur.fetchone()
     
+    # Returns id if data exists is table
+    if row:
+        id = row[0]
+
+    # Adds data into table and returns id if data doesn't already exist in table
+    else:
+        command = "INSERT INTO " + table + " (" + data_name + ") VALUES (?);"
+        cur.execute(command, (data,))
+        id = cur.lastrowid
+
+        conn.commit()
+
+    return id
 
 
-def insert_team_data(data, cur, conn):
+def insert_game_data(data, cur, conn):
 
-    # Insert home_team_name to teams Table
+    home_team_id = insert_into_table(data["home_team_name"], "team_name", "team_id", "teams", cur, conn)
+    away_team_id = insert_into_table(data["away_team_name"], "team_name", "team_id", "teams", cur, conn)
+    date_id = insert_into_table(data["date"], "game_date", "date_id", "gamedates", cur, conn)
+    city_id = insert_into_table(data["city"], "city_name", "city_name", "cities", cur, conn)
+
+    cords = get_city_coords(data["city"])
+
     cur.execute("""
-    INSERT INTO teams (team_name)
-        VALUES (?);
-    """, (data["home_team_name"],))
+    UPDATE cities
+    SET latitude = ?, longitude = ?
+    WHERE city_id = ?;
+    """, (cords["latitude"], cords["longitude"], city_id))
 
-    home_team_id = cur.lastrowid
-    print("home_team_id:", home_team_id)
+    weather = get_past_weather(cords["latitude"], cords["longitude"], data["date"])
 
-    # Insert away_team_name to teams Table
     cur.execute("""
-    INSERT INTO teams (team_name)
-        VALUES (?);
-    """, (data["away_team_name"],))
+    INSERT INTO weather (city_id, date_id, temp_max, temp_min, precipitation, windspeed_max)
+    VALUES (?, ?, ?, ?, ?, ?);
+    """, (city_id, date_id, weather["temp_max"], weather["temp_min"], weather["precipitation"], weather["wind_max"]))
 
-    away_team_id = cur.lastrowid
-    print("away_team_id:", away_team_id)
+    weather_id = cur.lastrowid
 
-    # Insert date to gamedates Table
+
     cur.execute("""
-    INSERTINTO gamedates (game_date)
-        VALUES (?);
-    """, (data["date"],))
-
-    date_id = cur.lastrowid
-    print("date_id:", date_id)
-
-    # Insert city to cities Table
-    cur.execute("""
-    INSERT INTO cities (city_name)
-        VALUES (?);
-    """, (data["city"],))
-
-    city_id = cur.lastrowid
-    print("city_id:", city_id)
-
-    team = cur.execute("""
-    INSERT INTO games (game_id, home_team_id, away_team_id, home_points, away_points, date_id, city_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?);
-    """, (data["game_id"], home_team_id, away_team_id, data["home_team_points"], data["away_team_points"], date_id, city_id))
+    INSERT INTO games (game_id, home_team_id, away_team_id, home_points, away_points, date_id, city_id, weather_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    """, (data["game_id"], home_team_id, away_team_id, data["home_team_points"], data["away_team_points"], date_id, city_id, weather_id))
 
     conn.commit()
 
@@ -130,7 +145,7 @@ def insert_team_data(data, cur, conn):
 
 def get_football_results():
     # Input: None
-    # Output: List of Dictonaries, each dictionary is a game and contains home_team_name(string), away_team_name(string), home_team_points(int), away_team_points(int), date(string), city(string)
+    # Output: List of Dictonaries, each dictionary is a game and contains home_team_name(str), away_team_name(str), home_team_points(int), away_team_points(int), date(str), city(str)
 
     API_KEY = 'NvYq3srg3jWcngq2uVqbwXg4Kl3ESAEbOwsEzlXxh2V7uRf05RbrAt3qSQqIvkrM'
     link = "https://api.collegefootballdata.com"
@@ -172,7 +187,7 @@ def get_football_results():
 
 
 def get_city_coords(city_name):
-    # Input: City name (string)
+    # Input: City name (str)
     # Output: Dictionary containing Latitude (float) and Longitude (float)
 
     link = "https://geocoding-api.open-meteo.com/v1"
@@ -236,16 +251,10 @@ def main():
     create_tables(cur, conn)
 
     games = get_football_results()
-    print(games[0]["city"])
+    # print(games[0]["city"])
 
-    for i in range(5):
-        insert_team_data(games[i], cur, conn)
-
-    coords = get_city_coords(games[0]["city"])
-    print(coords)
-
-    weather = get_past_weather(coords["latitude"], coords["longitude"], games[0]["date"])
-    print(weather)
+    for i in range(25):
+        insert_game_data(games[i], cur, conn)
 
 
 if __name__ == "__main__":
