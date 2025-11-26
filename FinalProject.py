@@ -1,7 +1,7 @@
 import requests
 import sqlite3
 import json
-
+import pprint
 
 
 
@@ -35,9 +35,7 @@ def create_tables(cur, conn):
     cur.execute("""            
     CREATE TABLE teams (
         team_id INTEGER PRIMARY KEY,
-        team_name TEXT NOT NULL,
-        city_id INTEGER NOT NULL,
-        FOREIGN KEY (city_id) REFERENCES cities(city_id)
+        team_name TEXT NOT NULL
     );""")
 
     cur.execute("""                
@@ -54,8 +52,9 @@ def create_tables(cur, conn):
         away_team_id INTEGER NOT NULL,
         home_points INTEGER,
         away_points INTEGER,
-        neutral_site BOOLEAN DEFAULT 0,
-
+        city_id INTEGER NOT NULL,
+                
+    FOREIGN KEY (city_id) REFERENCES cities(city_id)
     FOREIGN KEY (date_id) REFERENCES gamedates(date_id),
     FOREIGN KEY (home_team_id) REFERENCES teams(team_id),
     FOREIGN KEY (away_team_id) REFERENCES teams(team_id)
@@ -80,10 +79,21 @@ def create_tables(cur, conn):
     
 
 
+def insert_team_data(data):
+
+    # pprint.pprint(data)
+    pass
+
+
+
+
 
 def get_football_results(link):
+    # Input: link to College Football API
+    # Output: List of Dictonaries, each dictionary is a game and contains data home_team_name, away_team_name, home_team_points, away_team_points, date, city
 
     API_KEY = 'NvYq3srg3jWcngq2uVqbwXg4Kl3ESAEbOwsEzlXxh2V7uRf05RbrAt3qSQqIvkrM'
+    list = []
 
     headers = {
         "Authorization": "Bearer " + API_KEY
@@ -91,21 +101,50 @@ def get_football_results(link):
 
     params = {
         "year": 2023,
-        # "conference": "big ten",
-        "seasonType": "postseason"
+        "week": 2,
+        "seasonType": "regular"
     }
 
+    # game_data conatins all info except city, venue_data conatins cities for each statiom 
+    game_data = requests.get(link + "games", headers=headers, params=params)
+    venue_data = requests.get(link + "venues", headers=headers)
 
-    response = requests.get(link, headers=headers, params=params)
+    for game in game_data.json():
+        inner = {
+            "home_team_name": game["homeTeam"],
+            "away_team_name": game["awayTeam"],
+            "home_team_points": game["homePoints"],
+            "away_team_points": game["awayPoints"],
+            "date": game["startDate"][:10]}
 
-    print("Status:", response.status_code)
-    for game in response.json():
-        print(game["homeTeam"] + " vs " + game["awayTeam"])
+        # taking stadiom from game_data and cross referancing with venue_data to find city
+        for venue in venue_data.json():
+            if venue["name"] == game["venue"]:
+                inner["city"] = venue["city"]
+                break
+            
+        list.append(inner)
 
-    return response.json()
+    return list
 
 
+def get_city_coords(city_name):
+    url = "https://geocoding-api.open-meteo.com/v1/search"
+    params = {"name": city_name}
 
+    r = requests.get(url, params=params).json()
+
+    if "results" not in r or len(r["results"]) == 0:
+        return None
+
+    city = r["results"][0]
+
+    return {
+        "name": city["name"],
+        "lat": city["latitude"],
+        "lon": city["longitude"],
+        "country": city.get("country")
+    }
 
 
 def get_past_weather(lat, lon, date_str):
@@ -159,50 +198,29 @@ def get_past_weather(lat, lon, date_str):
 
 
 
-def get_city_coords(city_name):
-    url = "https://geocoding-api.open-meteo.com/v1/search"
-    params = {"name": city_name}
-
-    r = requests.get(url, params=params).json()
-
-    if "results" not in r or len(r["results"]) == 0:
-        return None
-
-    city = r["results"][0]
-
-    return {
-        "name": city["name"],
-        "lat": city["latitude"],
-        "lon": city["longitude"],
-        "country": city.get("country")
-    }
-
-
-
 
 def main():
-
-    # Ann Arbor, MI on 2024-11-20
-    ann_arbor = get_past_weather(42.2808, -83.7430, "2024-11-20")
-    print("Ann Arbor:", ann_arbor)
-
-
-    coords = get_city_coords("Ann Arbor")
-    print(coords)
-    lat = coords['lat']
-    long = coords['lon']
-
-
-    data = get_info("https://api.collegefootballdata.com/games")
-    
-    print(len(data))
-    
 
     db_path = "football_weather.db"
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
     create_tables(cur, conn)
+
+    # # Ann Arbor, MI on 2024-11-20
+    # ann_arbor = get_past_weather(42.2808, -83.7430, "2024-11-20")
+    # print("Ann Arbor:", ann_arbor)
+
+
+    # coords = get_city_coords("Ann Arbor")
+    # print(coords)
+    # lat = coords['lat']
+    # long = coords['lon']
+
+
+    data = get_football_results("https://api.collegefootballdata.com/")
+    
+    insert_team_data(data)
 
 
 if __name__ == "__main__":
