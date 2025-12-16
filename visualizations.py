@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd 
+import sqlite3
 
 CSV_FILE_1 = "avg_temp_and_pts_by_city.csv"
 CSV_FILE_2 = "finalproject_home_vs_away_by_lat.csv"
@@ -114,11 +115,69 @@ def vis_avg_points_by_weather_type():
     plt.savefig("vis3_points_by_weather_type.png")
     plt.close()
 
+def vis_visitor_points_vs_elevation(cur, conn):
+   cur.execute("""
+       SELECT c.elevation,
+              g.away_points,
+              g.home_points
+       FROM games g
+       JOIN cities c ON g.city_id = c.city_id
+       WHERE g.away_points IS NOT NULL
+         AND g.home_points IS NOT NULL
+         AND c.elevation IS NOT NULL
+         AND c.elevation > 0
+   """)
+
+
+   rows = cur.fetchall()
+
+
+   elevations = np.array([r[0] for r in rows])
+   away_points = np.array([r[1] for r in rows])
+   home_points = np.array([r[2] for r in rows])
+
+
+   # Green if away team wins, red if they lose
+   colors = np.where(away_points > home_points, "green", "red")
+
+
+   plt.figure(figsize=(8, 6))
+
+
+   # Scatter plot with win/loss coloring
+   plt.scatter(elevations, away_points, c=colors, alpha=0.7)
+
+
+   # Line of best fit
+   m, b = np.polyfit(elevations, away_points, 1)
+   x_vals = np.linspace(elevations.min(), elevations.max(), 100)
+   y_vals = m * x_vals + b
+   plt.plot(x_vals, y_vals, linestyle="--", label="Best Fit Line")
+
+
+   # Log scale for elevation
+   plt.xscale("log")
+
+
+   plt.xlabel("City Elevation (meters, log scale)")
+   plt.ylabel("Visitor Points")
+   plt.title("Visitor Points vs City Elevation (Log Scale)")
+   plt.grid(True, which="both", linestyle="--", alpha=0.3)
+   plt.tight_layout()
+   plt.savefig("vis_visitor_points_vs_elevation_log.png")
+   plt.close()
+
+   conn.close()
 
 def main():
+    db_path = "football_weather.db"
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
     vis_avg_metrics_by_city()
     vis_avg_points_by_latitude_bucket()
     vis_avg_points_by_weather_type()
+    vis_visitor_points_vs_elevation(cur, conn)
 
 if __name__ == "__main__":
     main()
