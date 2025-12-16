@@ -3,17 +3,17 @@ import sqlite3
 import json
 import pprint
 
-#def drop_tables(cur,conn):
+def drop_tables(cur,conn):
     # Followed commands from online
- #   commands = [
-  #      "DROP TABLE IF EXISTS cities",
-   #     "DROP TABLE IF EXISTS teams",
-    #    "DROP TABLE IF EXISTS gamedates",
-     #   "DROP TABLE IF EXISTS games",
-      #  "DROP TABLE IF EXISTS weather",]
+   commands = [
+       "DROP TABLE IF EXISTS cities",
+       "DROP TABLE IF EXISTS teams",
+       "DROP TABLE IF EXISTS gamedates",
+       "DROP TABLE IF EXISTS games",
+       "DROP TABLE IF EXISTS weather",]
     
-   # for command in commands:
-    #    cur.execute(command)
+   for command in commands:
+       cur.execute(command)
 
 
 
@@ -275,12 +275,7 @@ def main():
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
-    #drop_tables(cur, conn)
-
-    cords = get_city_coords("Ann Arbor")
-    print(cords)
-    aaElevation = get_elevation(cords["longitude"], cords["latitude"])
-    print(aaElevation)
+    # drop_tables(cur, conn)
 
     create_tables(cur, conn)
 
@@ -292,8 +287,6 @@ def main():
         print(count)
         if count >= 25:
             break
-        
-    insert_game_data(games[13], cur, conn)
 
 if __name__ == "__main__":
     main()
