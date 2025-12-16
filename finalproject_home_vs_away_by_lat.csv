@@ -1,0 +1,3 @@
+region,num_games,avg_home_points,avg_away_points,avg_home_margin
+Northern cities (lat ≥ 40),7,14.3,23.9,-9.6
+Southern cities (lat < 40),18,30.0,16.8,13.2
